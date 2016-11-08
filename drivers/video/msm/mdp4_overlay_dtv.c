@@ -649,11 +649,7 @@ int mdp4_dtv_on(struct platform_device *pdev)
 /* timing generator off */
 static void mdp4_dtv_tg_off(struct vsycn_ctrl *vctrl)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&vctrl->spin_lock, flags);
 	MDP_OUTP(MDP_BASE + DTV_BASE, 0); /* turn off timing generator */
-	spin_unlock_irqrestore(&vctrl->spin_lock, flags);
 	msleep(20);
 }
 
@@ -674,9 +670,10 @@ int mdp4_dtv_off(struct platform_device *pdev)
 
 	vctrl = &vsync_ctrl_db[cndx];
 
-	mdp4_dtv_wait4vsync(cndx);
-
 	wake_up_interruptible_all(&vctrl->wait_queue);
+
+	mdp4_dtv_wait4vsync(cndx);
+	mdp4_unmap_sec_resource(mfd);
 
 	pipe = vctrl->base_pipe;
 	if (pipe != NULL) {
@@ -1115,7 +1112,7 @@ void mdp4_dtv_overlay(struct msm_fb_data_type *mfd)
 	struct mdp4_overlay_pipe *pipe;
 
 	mutex_lock(&mfd->dma->ov_mutex);
-	if (!mfd->panel_power_on) {
+	if (mdp_fb_is_power_off(mfd)) {
 		mutex_unlock(&mfd->dma->ov_mutex);
 		return;
 	}
